@@ -773,7 +773,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "cap32";
-   info->library_version  = "4.2" " dskywalk b" __VDATE__;
+   info->library_version  = "4.2";
    info->valid_extensions = "dsk|sna|zip|tap|cdt|voc";
    info->need_fullpath    = true;
    info->block_extract = false;
