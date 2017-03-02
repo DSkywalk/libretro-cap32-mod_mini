@@ -179,11 +179,10 @@ void theloop(void);
 long GetTicks(void);
 int HandleExtension(char *path,char *ext);
 
-#include "libretro-core.h"
-extern unsigned int bmp[WINDOW_SIZE];//[400 * 300];
 extern char RPATH[512];
 extern int SND;
 extern int autorun,kbd_runcmd;
+extern int gfx_buffer_size;
 int autoboot_delay=0;
 
 extern void kbd_buf_feed(char *s);
@@ -765,6 +764,7 @@ uint8_t z80_IN_handler (reg_pair port)
                   if (PSG.reg_select < 16) { // within valid range?
                      if (PSG.reg_select == 14) { // PSG port A?
                         if (!(PSG.RegisterAY.Index[7] & 0x40)) { // port A in input mode?
+                           poll_input();
                            ret_val = keyboard_matrix[CPC.keyboard_line & 0x0f]; // read keyboard matrix node status
                         } else {
                            ret_val = PSG.RegisterAY.Index[14] & (keyboard_matrix[CPC.keyboard_line & 0x0f]); // return last value w/ logic AND of input
@@ -865,7 +865,7 @@ void z80_OUT_handler (reg_pair port, uint8_t val)
                 //colours[colour].r, colours[colour].g, colours[colour].b);
                if (GateArray.pen < 2) {
 
-//FIXME RETRO 
+//FIXME RETRO
 unsigned char r,g,b,r2,g2,b2;
 r=(colours[GateArray.ink_values[0]]>>16)&0xFF;
 g=(colours[GateArray.ink_values[0]]>>8)&0xFF;
@@ -995,7 +995,7 @@ GateArray.palette[18] = (b+b2)>>1 | ((g+g2)<< 7) | ((r+r2) << 15);
 
                      // matches maximum raster address?
                      if (CRTC.raster_count == CRTC.registers[9])
-                     { 
+                     {
                         temp = 1;
                         CRTC.flag_resscan = 1; // request a raster counter reset
                      }
@@ -1089,7 +1089,7 @@ GateArray.palette[18] = (b+b2)>>1 | ((g+g2)<< 7) | ((r+r2) << 15);
       if (pfoPrinter)
       {
          /* only grab data bytes; ignore the strobe signal */
-         if (!(CPC.printer_port & 0x80)) 
+         if (!(CPC.printer_port & 0x80))
             fputc(CPC.printer_port, pfoPrinter); // capture printer output to file
       }
    }
@@ -1884,7 +1884,7 @@ exit:
 
    if (iRetCode != 0) // on error, 'eject' disk from drive
       dsk_eject(drive);
-		
+
    return iRetCode;
 }
 
@@ -1973,7 +1973,7 @@ int dsk_format (t_drive *drive, int iFormat)
    for (track = 0; track < drive->tracks; track++)
    {
       /* loop for all tracks */
-      
+
       for (side = 0; side <= drive->sides; side++)
       {
          /* loop for all sides */
@@ -2357,7 +2357,7 @@ int tape_insert_voc (char *pchFileName)
                uint8_t bVocSample = *pbVocDataBlockPtr++;
 
                dwBit--;
-               
+
                if (bVocSample > VOC_THRESHOLD)
                   bByte |= bit_values[dwBit];
 
@@ -2451,7 +2451,7 @@ int emulator_patch_ROM (void)
       fread(pbROMlo, 2*16384, 1, pfileObject);
       fclose(pfileObject);
    }
-   else 
+   else
       return ERR_CPC_ROM_MISSING;
 
    if (CPC.keyboard)
@@ -2659,33 +2659,40 @@ int audio_init (void)
 void audio_shutdown (void) {}
 void audio_pause (void) {}
 void audio_resume (void) {}
+#ifdef M16B
+    #define RGB2COLOR(r, g, b) ((((r>>3)<<11) | ((g>>2)<<5) | (b>>3)))
+#else
+    #define RGB2COLOR(r, g, b) (b | ((g << 8) | (r << 16)))
+#endif
 
 int video_set_palette (void)
 {
 
    int n;
-  
+
 
    if (!CPC.scr_tube)
    {
       for (n = 0; n < 32; n++)
       {
-         uint32_t red, green, blue, colr;
+         PIXEL_TYPE colr;
+         int red, green, blue;
 
-         red = (uint32_t)(colours_rgb[n][0] * (CPC.scr_intensity / 10.0) * 255);
+         red = (int) (colours_rgb[n][0] * (CPC.scr_intensity / 10.0) * 255);
          if (red > 255) /* limit to the maximum */
             red = 255;
 
-         green = (uint32_t)(colours_rgb[n][1] * (CPC.scr_intensity / 10.0) * 255);
+         green = (int) (colours_rgb[n][1] * (CPC.scr_intensity / 10.0) * 255);
          if (green > 255)
             green = 255;
 
-         blue = (uint32_t)(colours_rgb[n][2] * (CPC.scr_intensity / 10.0) * 255);
+         blue = (int) (colours_rgb[n][2] * (CPC.scr_intensity / 10.0) * 255);
          if (blue > 255)
             blue = 255;
 
-         colr       = blue | (green << 8) | (red << 16);
-         colours[n] = colr ;//| (colr << 16);
+         colr       = (PIXEL_TYPE) RGB2COLOR(red, green, blue);
+         //colr       = blue | (green << 8) | (red << 16);
+         colours[n] = colr ;
 
       }
    }
@@ -2698,7 +2705,7 @@ int video_set_palette (void)
          if (green > 255)
             green = 255;
 
-         colours[n] = green << 8;
+         colours[n] = green << 5;
 
       }
    }
@@ -2714,21 +2721,20 @@ int video_set_palette (void)
    return 0;
 }
 
-#define STYLE 3
-
 void video_set_style (void)
 {
-   if (STYLE == 3/*vid_plugin->half_pixels*/)
+   if (CPC.scr_style == 3) //384x272
    {
       dwXScale = 1;
       dwYScale = 1;
 
    }
-   else
+   else                     //800x600
    {
       dwXScale = 2;
-      dwYScale = 1;
+      dwYScale = 2;
    }
+   printf("style: %u, dwScale: %ux%u\n", CPC.scr_style, dwXScale, dwYScale);
    switch (dwXScale)
    {
       case 1:
@@ -2745,37 +2751,35 @@ void video_set_style (void)
 
    switch(CPC.scr_bpp)
    {
-      case 32:
-         CPC.scr_render = (void(*)(void))render32bpp;
-         break;
-      case 24:
-         CPC.scr_render = (void(*)(void))render24bpp;
-         break;
       case 16:
-      case 15:
-         CPC.scr_render = (void(*)(void))render16bpp;
+         if(dwYScale == 2)
+            CPC.scr_render = (void(*)(void))render16bpp_doubleY;
+         else
+            CPC.scr_render = (void(*)(void))render16bpp;
          break;
-      case 8:
-         CPC.scr_render = (void(*)(void))render8bpp;
-         break;
+     case 32:
+        if(dwYScale == 2)
+           CPC.scr_render = (void(*)(void))render32bpp_doubleY;
+        else
+           CPC.scr_render = (void(*)(void))render32bpp;
+        break;
    }
 }
 
 int video_init (void)
-{ 
+{
    int error_code;
-   CPC.scr_bpp = 32;
+   CPC.scr_bpp = retro_getGfxBpp();
 
    error_code = video_set_palette(); // init CPC colours and hardware palette (in 8bpp mode)
    if (error_code)
-      return error_code; 
+      return error_code;
 
-   CPC.scr_bps       = WINDOW_WIDTH/*400*/ * 4 / 4;
-   CPC.scr_pos       = CPC.scr_base = (uint32_t *)&bmp[0];
-   CPC.scr_line_offs = CPC.scr_bps * 1;
+   video_set_style();
 
-   video_set_style(); 
-   memset(bmp, 0, sizeof(bmp));
+   CPC.scr_bps       = retro_getGfxBps();
+   CPC.scr_pos       = CPC.scr_base = retro_getScreenPtr();
+   CPC.scr_line_offs = CPC.scr_bps * dwYScale;
 
    return 0;
 }
@@ -2837,7 +2841,7 @@ void getConfigValueString (char* pchFileName, char* pchSection,
    if ((pfoConfigFile = fopen(pchFileName, "r")) != NULL)
    {
       /* open the config file */
-      
+
       while(fgets(chLine, MAX_LINE_LEN, pfoConfigFile) != NULL)
       {
          /* grab one line */
@@ -2907,10 +2911,11 @@ void loadConfiguration (void)
       CPC.keyboard = 0;
    CPC.joysticks     = getConfigValueInt(chFileName, "system", "joysticks", 0) & 1;
 
-   CPC.scr_fs_width  = getConfigValueInt(chFileName, "video", "scr_width", 384);
-   CPC.scr_fs_height = getConfigValueInt(chFileName, "video", "scr_height", 288);
+   CPC.scr_fs_width  = getConfigValueInt(chFileName, "video", "scr_width", 800);
+   CPC.scr_fs_height = getConfigValueInt(chFileName, "video", "scr_height", 600);
    CPC.scr_fs_bpp    = getConfigValueInt(chFileName, "video", "scr_bpp", 32);
-   CPC.scr_style     = getConfigValueInt(chFileName, "video", "scr_style", 4);
+   //CPC.scr_style     = getConfigValueInt(chFileName, "video", "scr_style", 4);
+   CPC.scr_style = retro_getStyle();
    CPC.scr_oglfilter = getConfigValueInt(chFileName, "video", "scr_oglfilter", 0) & 1;
    CPC.scr_vsync     = getConfigValueInt(chFileName, "video", "scr_vsync", 1) & 1;
    CPC.scr_led       = getConfigValueInt(chFileName, "video", "scr_led", 1) & 1;
@@ -2927,8 +2932,10 @@ void loadConfiguration (void)
    CPC.snd_enabled = getConfigValueInt(chFileName, "sound", "enabled", 1) & 1;
    CPC.snd_playback_rate = getConfigValueInt(chFileName, "sound", "playback_rate", 2);
    if (CPC.snd_playback_rate > (MAX_FREQ_ENTRIES-1)) {
-      CPC.snd_playback_rate = 2;
+      CPC.snd_playback_rate = 2; //44.1k
    }
+   // force libretro 48k
+   CPC.snd_playback_rate = EMU_SND_FREQ;
    CPC.snd_bits = getConfigValueInt(chFileName, "sound", "bits", 1) & 1;
    CPC.snd_stereo = getConfigValueInt(chFileName, "sound", "stereo", 1) & 1;
    CPC.snd_volume = getConfigValueInt(chFileName, "sound", "volume", 80);
@@ -3131,7 +3138,7 @@ void doCleanUp (void)
 {
    printer_stop();
    emulator_shutdown();
-     
+
    dsk_eject(&driveA);
    dsk_eject(&driveB);
 
@@ -3163,6 +3170,9 @@ void change_model(int val){
    if ((CPC.model == 2) && (CPC.ram_size < 128))
       CPC.ram_size   = 128; // minimum RAM size for CPC 6128 is 128KB
 
+    if ((CPC.model == 0) && (CPC.ram_size > 64))
+      CPC.ram_size   = 64; // minimum RAM size for CPC 6128 is 128KB
+
    /* Reconfigure emulator */
    emulator_shutdown();
    emulator_init();
@@ -3180,118 +3190,6 @@ void change_ram(int val){
    emulator_shutdown();
    emulator_init();
 //printf("change ram %d ---------------\n",val);
-}
-
-void retro_key_down(int key)
-{
-	int code;
-
-	if(key<512)
- 		code=KeySymToCPCKey[key];	
-	else code = CPC_KEY_NULL;
-	CPC_SetKey(code);
-}
-
-void retro_key_up(int key)
-{
-	int code;
-
-	if(key<512)
- 		code=KeySymToCPCKey[key];
-	else code = CPC_KEY_NULL;
-	CPC_ClearKey(code);
-}
-
-static int jflag[6]={0,0,0,0,0,0};
-
-void retro_joy0(unsigned char joy0)
-{
-   //0x01,0x02,0x04,0x08,0x80
-   // UP  DWN  LEFT RGT  BTN0
-   // 0    1     2   3    4
-
-   //UP
-   if(joy0&0x01)
-   {
-      if(jflag[0]==0)
-      {
-         retro_key_down(RETROK_HOME);
-         jflag[0]=1;
-      }
-   }
-   else
-   {
-      if(jflag[0]==1)
-      {
-         retro_key_up(RETROK_HOME);
-         jflag[0]=0;
-      }
-   }
-
-   //Down
-   if(joy0&0x02){
-      if(jflag[1]==0){
-         retro_key_down(RETROK_END);
-         jflag[1]=1;
-      }
-   }else {
-      if(jflag[1]==1){
-         retro_key_up(RETROK_END);
-         jflag[1]=0;
-      }
-   }
-
-   //Left
-   if(joy0&0x04){
-      if(jflag[2]==0){
-         retro_key_down(RETROK_DELETE);
-         jflag[2]=1;
-      }
-   }else {
-      if(jflag[2]==1){
-         retro_key_up(RETROK_DELETE);
-         jflag[2]=0;
-      }
-   }
-
-   //Right
-   if(joy0&0x08){
-      if(jflag[3]==0){
-         retro_key_down(RETROK_PAGEDOWN);
-         jflag[3]=1;
-      }
-   }else {
-      if(jflag[3]==1){
-         retro_key_up(RETROK_PAGEDOWN);
-         jflag[3]=0;
-      }
-   }
-
-   //btn0
-   if(joy0&0x80){
-      if(jflag[4]==0){
-         retro_key_down(RETROK_INSERT); 
-         jflag[4]=1;
-      }
-   }else {
-      if(jflag[4]==1){
-         retro_key_up(RETROK_INSERT); 
-         jflag[4]=0;
-      }
-   }
-
-   //btn1
-   if(joy0&0x40){
-      if(jflag[5]==0){
-         retro_key_down(RETROK_PAGEUP); 
-         jflag[5]=1;
-      }
-   }else {
-      if(jflag[5]==1){
-         retro_key_up(RETROK_PAGEUP); 
-         jflag[5]=0;
-      }
-   }
 }
 
 void mixsnd(void)
@@ -3332,7 +3230,7 @@ uint32_t dwSndDist;
 int iExitCondition;
 bool bolDone;
 
-bool have_DSK = false; 
+bool have_DSK = false;
 bool have_SNA = false;
 bool have_TAP = false;
 
@@ -3341,7 +3239,7 @@ bool have_TAP = false;
 #include "cpc_cat.h"
 
 static int cur_name_id  = 0;
-static int cur_name_top = 0;
+//static int cur_name_top = 0;
 
 int cpc_dsk_system = 0;
 int
@@ -3398,7 +3296,7 @@ int retro_disk_auto()
         if (! strcasecmp(scan+1, "")) {
           if (first_spc == -1) first_spc = index;
           found = 1;
-        } else 
+        } else
         if (! strcasecmp(scan+1, "BIN")) {
           if (first_bin == -1) first_bin = index;
           found = 1;
@@ -3416,16 +3314,16 @@ int retro_disk_auto()
 
     } else {
       if (first_bas != -1) cur_name_id = first_bas;
-      else 
+      else
       if (first_spc != -1) cur_name_id = first_spc;
-      else 
+      else
       if (first_bin != -1) cur_name_id = first_bin;
 
       sprintf(Buffer, "RUN\"%s", cpc_dsk_dirent[cur_name_id]);
     }
   }
 
-  //if (CPC.psp_explore_disk == CPC_EXPLORE_FULL_AUTO) 
+  //if (CPC.psp_explore_disk == CPC_EXPLORE_FULL_AUTO)
   {
     strcat(Buffer, "\n");
   }
@@ -3441,12 +3339,12 @@ int detach_disk(int drive)
    if(drive==0)
    {
       dsk_eject(&driveA);
-      sprintf(DISKA_NAME,"\0"); 
+      DISKA_NAME[0] = '\0';
    }
    else
    {
       dsk_eject(&driveB);
-      sprintf(DISKB_NAME,"\0"); 
+      DISKB_NAME[0]='\0';
    }
 
    return 0;
@@ -3456,20 +3354,20 @@ int loadadsk (char *arv,int drive)
 {
    if( HandleExtension(arv,"DSK") || HandleExtension(arv,"dsk") )
    {
-      if(drive==0)
+      if(drive==0){
 	     if(dsk_load( arv, &driveA, 'A') == 0){
 			sprintf(DISKA_NAME,"%s",arv);
             cap32_disk_dir(arv);
 			retro_disk_auto();
 		 }
-      else
-         if(dsk_load( arv, &driveB, 'B') == 0){   
-			sprintf(DISKB_NAME,"%s",arv); 
+      } else if(dsk_load( arv, &driveB, 'B') == 0){
+			sprintf(DISKB_NAME,"%s",arv);
             cap32_disk_dir(arv);
 			retro_disk_auto();
-		 }
+	  }
+
       have_DSK = true;
-      sprintf(RPATH,"%s%d.SNA",arv,drive);		
+      sprintf(RPATH,"%s%d.SNA",arv,drive);
    }
    else if( HandleExtension(arv,"sna") || HandleExtension(arv,"SNA") )
    {
@@ -3502,13 +3400,13 @@ void check_kbd_command()
    	else if (autoboot_delay==50)
    	{
    		if (!autorun)
-   			kbd_runcmd=false; 
-     	
+   			kbd_runcmd=false;
+
      	autoboot_delay++;
    	}
 
 	if(kbd_runcmd==true && autoboot_delay>50){
-    
+
 	  	static int pair=-1;
 
       	pair=-pair;
@@ -3536,10 +3434,11 @@ void retro_loop(void)
 
 void theloop(void)
 {
+    //int iTicksAdj = 0; // no adjustment necessary by default
 
-     if ((CPC.limit_speed) && (iExitCondition == EC_CYCLE_COUNT))
+   if ((CPC.limit_speed) && (iExitCondition == EC_CYCLE_COUNT))
    {
-      int iTicksAdj = 0; // no adjustment necessary by default
+
 
       if (CPC.snd_enabled)
       {
@@ -3549,22 +3448,22 @@ void theloop(void)
          else
             dwSndDist = (pbSndBufferEnd - pbSndStream) + (CPC.snd_bufferptr - pbSndBuffer);
 
+        #if 0
          if (dwSndDist < dwSndMinSafeDist)
             iTicksAdj = -5; // speed emulation up to compensate
          else if (dwSndDist > dwSndMaxSafeDist)
             iTicksAdj = 5; // slow emulation down to compensate
+        #endif
       }
 
    }
-
    uint32_t dwOffset = CPC.scr_pos - CPC.scr_base; // offset in current surface row
    if (VDU.scrln > 0)
-      CPC.scr_base = (uint32_t *)&bmp[0] + (VDU.scrln * CPC.scr_line_offs); // determine current position
+      CPC.scr_base = retro_getScreenPtr() + (VDU.scrln * CPC.scr_line_offs); // determine current position
    else
-      CPC.scr_base = (uint32_t *)&bmp[0]; // reset to surface start
+      CPC.scr_base = retro_getScreenPtr(); // reset to surface start
 
    CPC.scr_pos = CPC.scr_base + dwOffset; // update current rendering position
-
    iExitCondition = z80_execute(); // run the emulation until an exit condition is met
 
    if (iExitCondition == EC_FRAME_COMPLETE)
@@ -3593,7 +3492,7 @@ int capmain (int argc, char **argv)
    }
 
    /* init Z80 emulation */
-   z80_init_tables(); 
+   z80_init_tables();
 
    if (video_init())
    {
@@ -3628,4 +3527,3 @@ int capmain (int argc, char **argv)
 
    return 0;
 }
-

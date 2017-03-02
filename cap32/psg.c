@@ -515,9 +515,9 @@ void Synthesizer_Stereo16(void)
       Synthesizer_Mixer_Q();
       Tick_Counter++;
       LoopCount.Hi--;
-   } 
+   }
    LoopCount.Re += LoopCountInit;
-   reg_pair val;  
+   reg_pair val;
 
    val.w.l = Left_Chan / Tick_Counter;
    val.w.h = Right_Chan / Tick_Counter;
@@ -792,6 +792,7 @@ void ResetAYChipEmulation(void)
 
 void InitAYCounterVars(void)
 {
+    printf("snd freq: %d\n", CPC.snd_playback_rate);
    CPC.snd_cycle_count_init.both = (int64_t)rint((4000000 * ((CPC.speed * 25) / 100.0)) /
          freq_table[CPC.snd_playback_rate] * 4294967296.0); // number of Z80 cycles per sample
 

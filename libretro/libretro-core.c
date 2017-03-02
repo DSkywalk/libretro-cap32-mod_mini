@@ -1,12 +1,6 @@
 #include "libretro.h"
 #include "libretro-core.h"
 
-//#define RENDER16B
-//#undef RENDER16B
-#ifdef RENDER16B
-#define M16B
-#endif
-
 //CORE VAR
 #ifdef _WIN32
 char slash = '\\';
@@ -53,40 +47,37 @@ extern void retro_key_up(int key);
 extern void Screen_SetFullUpdate(int scr);
 
 //VIDEO
-unsigned int *Retro_Screen;
-unsigned int save_Screen[WINDOW_SIZE];
-unsigned int bmp[WINDOW_SIZE];
+PIXEL_TYPE *Retro_Screen;
+PIXEL_TYPE save_Screen[WINDOW_MAX_SIZE*PIXEL_BYTES];
+PIXEL_TYPE bmp[WINDOW_MAX_SIZE*PIXEL_BYTES];
 
 //SOUND
 short signed int SNDBUF[1024*2];
-int snd_sampler = 44100 / 50;
+int snd_sampler = LIBRETRO_SND_FREQ / 50;
 
 //PATH
 char RPATH[512];
 
-
+extern unsigned int padcfg[MAX_INPUTS];
 int pauseg=0; //enter_gui
 
 extern unsigned int *RetroScreen;
-extern int app_init(void);
+extern int app_init(int width, int height);
 extern int app_free(void);
 extern int app_render(int poll);
 
-int CROP_WIDTH;
-int CROP_HEIGHT;
-int VIRTUAL_WIDTH ;
-int retrow=WINDOW_WIDTH; 
-int retroh=WINDOW_HEIGHT;
+unsigned int retrow=0;
+unsigned int retroh=0;
+unsigned int retro_scr_style, retro_scr_bps=0;
+unsigned int gfx_buffer_size=0;
 
-#include "vkbd.i"
-
+#include "vkbd.c"
 unsigned amstrad_devices[ 2 ];
 
 int autorun=0;
 
 int RETROJOY=0,RETROSTATUS=0,RETRODRVTYPE=0;
 int retrojoy_init=0,retro_ui_finalized=0;
-
 int cap32_statusbar=0;
 
 //CAP32 DEF BEGIN
@@ -105,7 +96,7 @@ extern void input_gui(void);
 const char *retro_save_directory;
 const char *retro_system_directory;
 const char *retro_content_directory;
-char retro_system_data_directory[512];;
+char retro_system_data_directory[512];
 
 /*static*/ retro_input_state_t input_state_cb;
 /*static*/ retro_input_poll_t input_poll_cb;
@@ -122,6 +113,24 @@ void retro_set_input_state(retro_input_state_t cb)
 void retro_set_input_poll(retro_input_poll_t cb)
 {
    input_poll_cb = cb;
+}
+
+unsigned int retro_getStyle(){
+    return retro_scr_style;
+}
+
+unsigned int retro_getGfxBpp(){
+    printf("getBPP: %u\n", 8 * PIXEL_BYTES);
+    return 8 * PIXEL_BYTES;
+}
+
+unsigned int retro_getGfxBps(){
+    printf("getBPS: %u\n", retrow);
+    return retrow;
+}
+
+inline PIXEL_TYPE * retro_getScreenPtr(){
+    return Retro_Screen;
 }
 
 #include <ctype.h>
@@ -144,11 +153,11 @@ void Add_Option(const char* option)
 
    if(first==0)
    {
-      PARAMCOUNT=0;	
+      PARAMCOUNT=0;
       first++;
    }
 
-   sprintf(XARGV[PARAMCOUNT++],"%s\0",option);
+   sprintf(XARGV[PARAMCOUNT++],"%s%c",option, '\0');
 }
 
 int pre_main(const char *argv)
@@ -156,7 +165,7 @@ int pre_main(const char *argv)
    int i;
    bool Only1Arg;
 
-   parse_cmdline(argv); 
+   parse_cmdline(argv);
 
    Only1Arg = (strcmp(ARGUV[0],"x64") == 0) ? 0 : 1;
 
@@ -185,7 +194,7 @@ int pre_main(const char *argv)
       LOGI("%2d  %s\n",i,XARGV[i]);
    }
 
-   skel_main(PARAMCOUNT,( char **)xargv_cmd); 
+   skel_main(PARAMCOUNT,( char **)xargv_cmd);
 
    xargv_cmd[PARAMCOUNT - 2] = NULL;
 
@@ -198,7 +207,7 @@ void parse_cmdline(const char *argv)
 	int c,c2;
 	static char buffer[512*4];
 	enum states { DULL, IN_WORD, IN_STRING } state = DULL;
-	
+
 	strcpy(buffer,argv);
 	strcat(buffer," \0");
 
@@ -228,7 +237,7 @@ void parse_cmdline(const char *argv)
                //... do something with the word ...
                for (c2 = 0,p2 = start_of_word; p2 < p; p2++, c2++)
                   ARGUV[ARGUC][c2] = (unsigned char) *p2;
-               ARGUC++; 
+               ARGUC++;
 
                state = DULL; /* back to "not in word, not in string" state */
             }
@@ -241,12 +250,12 @@ void parse_cmdline(const char *argv)
                //... do something with the word ...
                for (c2 = 0,p2 = start_of_word; p2 <p; p2++,c2++)
                   ARGUV[ARGUC][c2] = (unsigned char) *p2;
-               ARGUC++; 
+               ARGUC++;
 
                state = DULL; /* back to "not in word, not in string" state */
             }
             continue; /* either still IN_WORD or we handled the end above */
-      }	
+      }
    }
 }
 
@@ -280,7 +289,7 @@ long GetTicks(void)
    return (now.tv_sec*1000000 + now.tv_nsec/1000);///1000;
 #endif
 
-} 
+}
 
 int HandleExtension(char *path,char *ext)
 {
@@ -317,13 +326,12 @@ void enter_options(void) {}
 
 void save_bkg()
 {
-	memcpy(save_Screen,Retro_Screen,PITCH*WINDOW_SIZE/*400*300*/);
-
+	memcpy(save_Screen,Retro_Screen,gfx_buffer_size);
 }
 
 void restore_bgk()
 {
-	memcpy(Retro_Screen,save_Screen,PITCH*WINDOW_SIZE/*400*300*/);
+	memcpy(Retro_Screen,save_Screen,gfx_buffer_size);
 }
 
 void texture_uninit(void)
@@ -336,10 +344,10 @@ void texture_init(void)
 
 void Screen_SetFullUpdate(int scr)
 {
-   if(scr==0 ||scr>1)
-      memset(&Retro_Screen, 0, sizeof(Retro_Screen));
-   if(scr>0)
-      memset(&bmp,0,sizeof(bmp));
+   if(!scr)
+      memset(Retro_Screen, 0, gfx_buffer_size);
+   else
+      memset(bmp,0,gfx_buffer_size);
 }
 
 void retro_set_environment(retro_environment_t cb)
@@ -366,22 +374,39 @@ void retro_set_environment(retro_environment_t cb)
 
    struct retro_variable variables[] = {
 
-	  { 
+	  {
 		"cap32_autorun",
-		"Autorun; disabled|enabled" ,
+		"Autorun; enabled|disabled" ,
 	  },
       {
          "cap32_resolution",
-         "Internal resolution; 384x272|400x300",
+         "Internal resolution; 384x272|800x600",
       },
       {
          "cap32_Model",
-         "Model:; 464|664|6128",
+         "Model:; 6128|464",
       },
       {
          "cap32_Ram",
-         "Ram size:; 64|128|192|512|576",
+         "Ram size:; 128|64|512",
       },
+      {
+         "cap32_scr_tube",
+         "scr_tube; color|green",
+      },
+      {
+         "cap32_scr_intensity",
+         "scr_intensity; 8|9|10|11|12|13|14|15",
+      },
+      {
+         "cap32_pad1cfg",
+         "Pad1 CFG; cursors|joystick|qaop|sxkl",
+      },
+      {
+         "cap32_pad2cfg",
+         "Pad2 CFG; joystick|qaop|sxkl|cursors",
+      },
+      #if 0
       {
          "cap32_Statusbar",
          "Status Bar; disabled|enabled",
@@ -390,30 +415,58 @@ void retro_set_environment(retro_environment_t cb)
          "cap32_Drive",
          "Drive:; 0|1",
       },
-      {
-         "cap32_scr_tube",
-         "scr_tube; disabled|enabled",
-      },
-      {
-         "cap32_scr_intensity",
-         "scr_intensity; 5|6|7|8|9|10|11|12|13|14|15",
-      },
-#if 0
 
       {
          "cap32_scr_remanency",
          "scr_remanency; disabled|enabled",
       },
-#endif
       {
          "cap32_RetroJoy",
          "Retro joy0; disabled|enabled",
       },
+#endif
 
       { NULL, NULL },
    };
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+}
+
+static void update_variables_gfx(void)
+{
+    struct retro_variable var;
+
+    var.key = "cap32_resolution";
+    var.value = NULL;
+
+    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+      char *pch;
+      char str[100];
+      snprintf(str, sizeof(str), "%s", var.value);
+
+      pch = strtok(str, "x");
+      if (pch)
+         retrow = strtoul(pch, NULL, 0);
+      pch = strtok(NULL, "x");
+      if (pch)
+         retroh = strtoul(pch, NULL, 0);
+
+    retro_scr_bps = retrow * retroh;
+    gfx_buffer_size = retro_scr_bps * PIXEL_BYTES;
+    switch(retrow){
+        case 384:
+            retro_scr_style = 3;
+            break;
+        case 800:
+            retro_scr_style = 4;
+            break;
+    }
+
+      fprintf(stderr, "[libretro-cap32]: Got size: %u x %u (s%d rs%d bs%u).\n",
+        retrow, retroh, retro_scr_style, gfx_buffer_size, (unsigned int) sizeof(bmp));
+
+    }
 }
 
 static void update_variables(void)
@@ -428,35 +481,6 @@ static void update_variables(void)
    {
      if (strcmp(var.value, "enabled") == 0)
 			 autorun = 1;
-   }
-
-   var.key = "cap32_resolution";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-      char *pch;
-      char str[100];
-      snprintf(str, sizeof(str), "%s", var.value);
-
-      pch = strtok(str, "x");
-      if (pch)
-         retrow = strtoul(pch, NULL, 0);
-      pch = strtok(NULL, "x");
-      if (pch)
-         retroh = strtoul(pch, NULL, 0);
-
-	//FIXME remove force res
-	retrow=WINDOW_WIDTH;
-	retroh=WINDOW_HEIGHT;
-
-      fprintf(stderr, "[libretro-cap32]: Got size: %u x %u.\n", retrow, retroh);
-
-      CROP_WIDTH =retrow;
-      CROP_HEIGHT= (retroh-80);
-      VIRTUAL_WIDTH = retrow;
-      texture_init();
-      //reset_screen();
    }
 
    var.key = "cap32_Model";
@@ -530,9 +554,9 @@ static void update_variables(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
 		if(retro_ui_finalized){
-      		if (strcmp(var.value, "enabled") == 0){
+      		if (strcmp(var.value, "green") == 0){
          		  CPC.scr_tube=1;video_set_palette();}
-      		if (strcmp(var.value, "disabled") == 0){
+      		else {
          		 CPC.scr_tube=0;video_set_palette();}
 		}
    }
@@ -550,7 +574,24 @@ static void update_variables(void)
       if(retro_ui_finalized){
          CPC.scr_intensity = val;
          video_set_palette();
-      }	
+      }
+   }
+   var.key = "cap32_pad1cfg";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+       if (strcmp(var.value, "joystick") == 0) padcfg[ID_PLAYER1] = 1;
+       else if (strcmp(var.value, "qaop") == 0) padcfg[ID_PLAYER1] = 2;
+       else if (strcmp(var.value, "sxkl") == 0) padcfg[ID_PLAYER1] = 3;
+       else padcfg[ID_PLAYER1] = 0;
+   }
+
+   var.key = "cap32_pad2cfg";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+       if (strcmp(var.value, "joystick") == 0) padcfg[ID_PLAYER2] = 1;
+       else if (strcmp(var.value, "qaop") == 0) padcfg[ID_PLAYER2] = 2;
+       else if (strcmp(var.value, "sxkl") == 0) padcfg[ID_PLAYER2] = 3;
+       else padcfg[ID_PLAYER2] = 0;
    }
 
 #if 0
@@ -566,7 +607,7 @@ static void update_variables(void)
          		 CPC.scr_remanency=0;video_set_palette();}//set_truedrive_emultion(0);
 		}
    }
-#endif
+
 
    var.key = "cap32_RetroJoy";
    var.value = NULL;
@@ -585,14 +626,13 @@ static void update_variables(void)
 		}
 
    }
-
+   #endif
 }
 
 
 void Emu_init(){
 
    pre_main(RPATH);
-
    update_variables();
 }
 
@@ -614,34 +654,33 @@ void retro_shutdown_core(void)
 }
 
 void retro_reset(void){
-
 	emu_reset();
 }
 
 void retro_init(void)
-{    	
+{
    const char *system_dir = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir) && system_dir)
    {
-      // if defined, use the system directory			
-      retro_system_directory=system_dir;		
-   }		   
+      // if defined, use the system directory
+      retro_system_directory=system_dir;
+   }
 
    const char *content_dir = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_CONTENT_DIRECTORY, &content_dir) && content_dir)
    {
-      // if defined, use the system directory			
-      retro_content_directory=content_dir;		
-   }			
+      // if defined, use the system directory
+      retro_content_directory=content_dir;
+   }
 
    const char *save_dir = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save_dir) && save_dir)
    {
       // If save directory is defined use it, otherwise use system directory
-      retro_save_directory = *save_dir ? save_dir : retro_system_directory;      
+      retro_save_directory = *save_dir ? save_dir : retro_system_directory;
    }
    else
    {
@@ -649,25 +688,25 @@ void retro_init(void)
       retro_save_directory=retro_system_directory;
    }
 
-   if(retro_system_directory==NULL)sprintf(RETRO_DIR, "%s\0",".");
-   else sprintf(RETRO_DIR, "%s\0", retro_system_directory);
+   if(retro_system_directory==NULL)sprintf(RETRO_DIR, "%s%c",".", '\0');
+   else sprintf(RETRO_DIR, "%s%c", retro_system_directory, '\0');
 
-   sprintf(retro_system_data_directory, "%s/data\0",RETRO_DIR);
+   sprintf(retro_system_data_directory, "%s/data%c",RETRO_DIR, '\0');
 
    LOGI("Retro SYSTEM_DIRECTORY %s\n",retro_system_directory);
    LOGI("Retro SAVE_DIRECTORY %s\n",retro_save_directory);
    LOGI("Retro CONTENT_DIRECTORY %s\n",retro_content_directory);
 
-#ifndef RENDER16B
+#ifndef M16B
     	enum retro_pixel_format fmt =RETRO_PIXEL_FORMAT_XRGB8888;
 #else
     	enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
 #endif
-   
+
    if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
    {
       fprintf(stderr, "PIXEL FORMAT is not supported.\n");
-LOGI("PIXEL FORMAT is not supported.\n");
+      LOGI("PIXEL FORMAT is not supported.\n");
       exit(0);
    }
 
@@ -691,18 +730,25 @@ LOGI("PIXEL FORMAT is not supported.\n");
 	};
 	environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, &inputDescriptors);
 
-   texture_init();
+    LOGI("Retro Init\n");
+
+    update_variables();
+    update_variables_gfx();
+
+    //bmp = malloc(gfx_buffer_size);
+    app_init(retrow, retroh);
+
 
 }
 
 extern void main_exit();
 void retro_deinit(void)
 {
-   app_free(); 
- 
-   Emu_uninit(); 
+   app_free();
 
-   UnInitOSGLU();	
+   Emu_uninit();
+
+   UnInitOSGLU();
 
    LOGI("Retro DeInit\n");
 }
@@ -737,8 +783,9 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    /* FIXME handle PAL/NTSC */
-   struct retro_game_geometry geom = { retrow, retroh, 400, 300,4.0 / 3.0 };
-   struct retro_system_timing timing = { 50.0, 44100.0 };
+   printf("retrow: %u\n", retrow);
+   struct retro_game_geometry geom = { retrow, retroh, TEX_MAX_WIDTH, TEX_MAX_HEIGHT, 4.0 / 3.0 };
+   struct retro_system_timing timing = { 50.0, (float) LIBRETRO_SND_FREQ };
 
    info->geometry = geom;
    info->timing   = timing;
@@ -765,13 +812,8 @@ void retro_audio_cb( short l, short r)
 }
 
 void retro_audiocb(signed short int *sound_buffer,int sndbufsize){
-   int x; 
-   if(pauseg==0)for(x=0;x<sndbufsize;x++)audio_cb(sound_buffer[x],sound_buffer[x]);	
-}
-
-void retro_blit()
-{
-   memcpy(Retro_Screen,bmp,PITCH*WINDOW_SIZE);
+   int x;
+   if(pauseg==0)for(x=0;x<sndbufsize;x++)audio_cb(sound_buffer[x],sound_buffer[x]);
 }
 
 void retro_run(void)
@@ -784,15 +826,19 @@ void retro_run(void)
 
    if(pauseg==0)
    {
-      	retro_loop();
-	retro_blit();
-	Core_PollEvent();
+    retro_loop();
+    #ifdef __ARM_NEON__
+    //memcpy(Retro_Screen, bmp, gfx_buffer_size);
+    #else
+    //memcpy(Retro_Screen, bmp, gfx_buffer_size);
+    #endif
+    gui_input();
+	//Core_PollEvent();
    }
 
    app_render(pauseg);
 
-
-   video_cb(Retro_Screen,retrow,retroh,retrow<<PIXEL_BYTES);
+   video_cb(Retro_Screen,retrow,retroh,retrow * PIXEL_BYTES);
 
 }
 
@@ -829,10 +875,6 @@ bool retro_load_game(const struct retro_game_info *info)
    full_path = info->path;
 
    strcpy(RPATH,full_path);
-
-   update_variables();
-
-   app_init();
 
 	memset(SNDBUF,0,1024*2*2);
 
@@ -902,4 +944,3 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
    (void)enabled;
    (void)code;
 }
-

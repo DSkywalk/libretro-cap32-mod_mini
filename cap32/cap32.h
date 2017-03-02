@@ -27,7 +27,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdbool.h>
-//RETRO HACK 
+#include "libretro-core.h"
+
+//RETRO HACK
 //TODO ENDIANNESS
 //#define DEBUG 1
 //#define DEBUG_CRTC
@@ -224,8 +226,8 @@ typedef struct {
    unsigned int scr_bpp;
    unsigned int scr_bps;
    unsigned int scr_line_offs;
-   unsigned int *scr_base;
-   unsigned int *scr_pos;
+   PIXEL_TYPE *scr_base;
+   PIXEL_TYPE *scr_pos;
    void (*scr_render)(void);
    void (*scr_prerendernorm)(void);
    void (*scr_prerenderbord)(void);
@@ -250,7 +252,7 @@ typedef struct {
          unsigned int high;
          unsigned int low;
       };
-#else     
+#else
       struct
       {
          unsigned int low;
@@ -371,7 +373,7 @@ typedef struct
          unsigned int high;
          unsigned int low;
       };
-#else     
+#else
       struct
       {
          unsigned int low;

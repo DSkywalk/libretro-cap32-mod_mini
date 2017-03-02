@@ -15,12 +15,13 @@
 
 // RSDL_surface/RSDL_maprgba (implementation from RSDL_wrapper)
 #include "RSDL_wrapper.h"
+void draw_cross(RSDL_Surface *surface,int x,int y);
 
 typedef struct nk_retro_Font nk_retro_Font;
 typedef struct nk_retro_event nk_retro_event;
 
 NK_API struct nk_context*   nk_retro_init(nk_retro_Font *font,RSDL_Surface *screen_surface ,unsigned int width, unsigned int height);
-NK_API void                 nk_retro_handle_event(int *evt,int poll);
+NK_API void                 nk_retro_handle_event(int poll);
 NK_API void                 nk_retro_render(struct nk_color clear);
 NK_API void                 nk_retro_shutdown(void);
 
@@ -94,7 +95,7 @@ nk_retro_scissor(RSDL_Surface *surface, float x, float y, float w, float h)
 {
     RSDL_clip_rect.x = x;
     RSDL_clip_rect.y = y;
-    RSDL_clip_rect.w = w  + 1; 
+    RSDL_clip_rect.w = w  + 1;
     RSDL_clip_rect.h = h;
     RSDL_SetClipRect(surface, &RSDL_clip_rect);
 }
@@ -112,7 +113,7 @@ nk_retro_stroke_rect(RSDL_Surface *surface, short x, short y, unsigned short w,
 {
     /* Note: thickness is not used by default */
     if (r == 0) {
-        rectangleRGBA(surface, x, y, x + w, y + h, col.r, col.g, col.b, col.a); 
+        rectangleRGBA(surface, x, y, x + w, y + h, col.r, col.g, col.b, col.a);
     } else {
         roundedRectangleRGBA(surface, x, y, x + w, y + h, r, col.r, col.g, col.b, col.a);
     }
@@ -123,13 +124,13 @@ nk_retro_fill_rect(RSDL_Surface *surface, short x, short y, unsigned short w,
     unsigned short h, unsigned short r, struct nk_color col)
 {
     if (r == 0) {
-       boxRGBA(surface, x, y, x + w, y + h, col.r, col.g, col.b, col.a); 
+       boxRGBA(surface, x, y, x + w, y + h, col.r, col.g, col.b, col.a);
     } else {
         roundedBoxRGBA(surface, x, y, x + w, y + h, r, col.r, col.g, col.b, col.a);
     }
 }
 
-static void 
+static void
 nk_retro_fill_triangle(RSDL_Surface *surface, short x0, short y0, short x1, short y1, short x2, short y2, struct nk_color col)
 {
     filledTrigonRGBA(surface, x0, y0, x1, y1, x2, y2, col.r, col.g, col.b, col.a);
@@ -140,7 +141,7 @@ nk_retro_stroke_triangle(RSDL_Surface *surface, short x0, short y0, short x1,
     short y1, short x2, short y2, unsigned short line_thickness, struct nk_color col)
 {
     /* Note: thickness is not used by default */
-    aatrigonRGBA(surface, x0, y0, x1, y1, x2, y2, col.r, col.g, col.b, col.a); 
+    aatrigonRGBA(surface, x0, y0, x1, y1, x2, y2, col.r, col.g, col.b, col.a);
 }
 
 static void
@@ -168,7 +169,7 @@ nk_retro_stroke_polygon(RSDL_Surface *surface, const struct nk_vec2i *pnts, int 
         p_x[i] = pnts[i].x;
         p_y[i] = pnts[i].y;
     }
-    aapolygonRGBA(surface, (Sint16 *)p_x, (Sint16 *)p_y, count, col.r, col.g, col.b, col.a); 
+    aapolygonRGBA(surface, (Sint16 *)p_x, (Sint16 *)p_y, count, col.r, col.g, col.b, col.a);
 }
 
 static void
@@ -198,7 +199,7 @@ static void
 nk_retro_fill_circle(RSDL_Surface *surface, short x, short y, unsigned short w,
     unsigned short h, struct nk_color col)
 {
-    filledEllipseRGBA(surface,  x + w /2, y + h /2, w / 2, h / 2, col.r, col.g, col.b, col.a); 
+    filledEllipseRGBA(surface,  x + w /2, y + h /2, w / 2, h / 2, col.r, col.g, col.b, col.a);
 }
 
 static void
@@ -206,7 +207,7 @@ nk_retro_stroke_circle(RSDL_Surface *surface, short x, short y, unsigned short w
     unsigned short h, unsigned short line_thickness, struct nk_color col)
 {
     /* Note: thickness is not used by default */
-    aaellipseRGBA (surface,  x + w /2, y + h /2, w / 2, h / 2, col.r, col.g, col.b, col.a); 
+    aaellipseRGBA (surface,  x + w /2, y + h /2, w / 2, h / 2, col.r, col.g, col.b, col.a);
 }
 
 static void
@@ -287,7 +288,7 @@ nk_retro_fill_rect_multi_color(RSDL_Surface *surface, short x, short y, unsigned
             interpolate_color(left, top, &X1, fraction_x);
             interpolate_color(right, bottom, &X2, fraction_x);
             interpolate_color(X1, X2, &Y, fraction_y);
-            pixelRGBA(surface, x + i, y + j, Y.r, Y.g, Y.b, Y.a); 
+            pixelRGBA(surface, x + i, y + j, Y.r, Y.g, Y.b, Y.a);
         }
     }
 }
@@ -387,7 +388,7 @@ nk_retro_render(struct nk_color clear)
     }
     nk_retro_blit(retro.screen_surface);
     nk_clear(&retro.ctx);
-	
+
 	//FIXME draw only in fullscreen or mouse grabbed or when joypad emulate mouse
 	if(revent.showpointer==1)draw_cross(retro.screen_surface,revent.gmx,revent.gmy);
 
@@ -430,7 +431,7 @@ static float
 nk_retro_get_text_width(nk_handle handle, float height, const char *text, int len)
 {
     nk_retro_Font *font = (nk_retro_Font*)handle.ptr;
- 
+
     if(!font || !text)
         return 0;
     return len * font->width;
@@ -453,7 +454,7 @@ static void retro_init_event()
 }
 
 
-NK_API struct nk_retro_event* 
+NK_API struct nk_retro_event*
 nk_retro_event_ptr()
 {
 	nk_retro_event* event=&revent;
@@ -541,15 +542,15 @@ static void Process_key()
 
 	for(i=0;i<320;i++)
         	revent.Key_Sate[i]=input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0,i) ? 0x80: 0;
-   
+
 	if(memcmp( revent.Key_Sate,revent.old_Key_Sate , sizeof(revent.Key_Sate) ) )
 	 	for(i=0;i<320;i++)
 			if(revent.Key_Sate[i] && revent.Key_Sate[i]!=revent.old_Key_Sate[i]  )
         	{
-	
+
 				if(i==RETROK_RSHIFT){
 					revent.LSHIFTON=-revent.LSHIFTON;
-					printf("Modifier shift pressed %d \n",revent.LSHIFTON); 
+					printf("Modifier shift pressed %d \n",revent.LSHIFTON);
 					continue;
 				}
 /*
@@ -560,30 +561,30 @@ static void Process_key()
 
 				if(i==RETROK_RCTRL){
 					//CTRLON=-CTRLON;
-					printf("Modifier crtl pressed %d \n",CTRLON); 
+					printf("Modifier crtl pressed %d \n",CTRLON);
 					continue;
 				}
 				if(i==RETROK_RSHIFT){
 					//SHITFON=-SHITFON;
-					printf("Modifier shift pressed %d \n",SHIFTON); 
+					printf("Modifier shift pressed %d \n",SHIFTON);
 					continue;
 				}
 
 				if(i==RETROK_LALT){
 					//KBMOD=-KBMOD;
-					printf("Modifier alt pressed %d \n",KBMOD); 
+					printf("Modifier alt pressed %d \n",KBMOD);
 					continue;
 				}
 //printf("press: %d \n",i);
 */
 				retro_key(i,1);
-	
-        	}	
+
+        	}
         	else if ( !revent.Key_Sate[i] && revent.Key_Sate[i]!=revent.old_Key_Sate[i]  )
         	{
 				if(i==RETROK_LSHIFT){
 					revent.LSHIFTON=-revent.LSHIFTON;
-					printf("Modifier shift released %d \n",revent.LSHIFTON); 
+					printf("Modifier shift released %d \n",revent.LSHIFTON);
 					continue;
 				}
 /*
@@ -594,32 +595,75 @@ static void Process_key()
 
 				if(i==RETROK_RCTRL){
 					CTRLON=-CTRLON;
-					printf("Modifier crtl released %d \n",CTRLON); 
+					printf("Modifier crtl released %d \n",CTRLON);
 					continue;
 				}
 				if(i==RETROK_RSHIFT){
 					SHIFTON=-SHIFTON;
-					printf("Modifier shift released %d \n",SHIFTON); 
+					printf("Modifier shift released %d \n",SHIFTON);
 					continue;
 				}
 
 				if(i==RETROK_LALT){
 					KBMOD=-KBMOD;
-					printf("Modifier alt released %d \n",KBMOD); 
+					printf("Modifier alt released %d \n",KBMOD);
 					continue;
 				}
 //printf("release: %d \n",i);
 */
 				retro_key(i,0);
-	
-        	}	
+
+        	}
 
 	memcpy(revent.old_Key_Sate,revent.Key_Sate , sizeof(revent.Key_Sate) );
 
 }
 
 NK_API void
-nk_retro_handle_event(int *evt,int poll)
+nk_retro_handle_event(int poll)
+{
+   static int mmbL=0;
+   static int lmx=0,lmy=0;
+   struct nk_context *ctx = &retro.ctx;
+
+   int mouse_l;
+   int mouse_x=0,mouse_y=0;
+
+   if(poll) input_poll_cb();
+
+   mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
+
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))mouse_x += revent.MOUSE_PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))mouse_x -= revent.MOUSE_PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))mouse_y += revent.MOUSE_PAS;
+   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))mouse_y -= revent.MOUSE_PAS;
+
+   revent.gmx+=mouse_x;
+   revent.gmy+=mouse_y;
+   if(revent.gmx<0)revent.gmx=0;
+   if(revent.gmx>retro.width-1)revent.gmx=retro.width-1;
+   if(revent.gmy<0)revent.gmy=0;
+   if(revent.gmy>retro.height-1)revent.gmy=retro.height-1;
+
+   if(mmbL==0 && mouse_l){
+       mmbL=1;
+       mousebut(1,1,revent.gmx,revent.gmy);
+   }
+   else if(mmbL==1 && !mouse_l)
+   {
+      mmbL=0;
+      mousebut(1,0,revent.gmx,revent.gmy);
+   }
+   if(revent.gmx!=lmx || lmy!=revent.gmy){
+       nk_input_motion(ctx, revent.gmx, revent.gmy);
+       //printf("mx:%d my:%d \n",gmx,gmy);
+   }
+   lmx=revent.gmx;lmy=revent.gmy;
+
+}
+
+NK_API void
+nk_retro_handle_event_old(int *evt,int poll)
 {
    struct nk_context *ctx = &retro.ctx;
 
@@ -635,7 +679,7 @@ nk_retro_handle_event(int *evt,int poll)
 
    Process_key();
 
-   int i=2;//TOGGLE: real mouse/ joypad emulate mouse 
+   int i=2;//TOGGLE: real mouse/ joypad emulate mouse
    if ( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) && mbt[i]==0 )
       mbt[i]=1;
    else if ( mbt[i]==1 && ! input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i) ){
@@ -649,7 +693,7 @@ nk_retro_handle_event(int *evt,int poll)
 
    if(revent.MOUSE_EMULATED==1){
 
-      if(revent.slowdown>0)return 1;
+      if(revent.slowdown>0)return;
 
       mouse_l=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A);
       mouse_r=input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
@@ -660,7 +704,7 @@ nk_retro_handle_event(int *evt,int poll)
    else {
    		mouse_l    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT);
    		mouse_r    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT);
-   		mouse_m    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_MIDDLE); 
+   		mouse_m    = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_MIDDLE);
    }
 
 	//relative
@@ -710,7 +754,7 @@ nk_retro_handle_event(int *evt,int poll)
          if(holdleft==0)
          {
             starthold=GetTicks();
-            holdleft=1;	
+            holdleft=1;
          }
          else if(holdleft==1)
          {
@@ -735,7 +779,7 @@ nk_retro_handle_event(int *evt,int poll)
 
     if(mmbL==0 && mouse_l){
 
-		mmbL=1;		
+		mmbL=1;
 		mousebut(1,1,revent.gmx,revent.gmy);
     }
     else if(mmbL==1 && !mouse_l)
@@ -752,7 +796,7 @@ nk_retro_handle_event(int *evt,int poll)
     if(mmbR==0 && mouse_r){
 
       	mmbR=1;
-		mousebut(2,1,revent.gmx,revent.gmy);		
+		mousebut(2,1,revent.gmx,revent.gmy);
    	}
    	else if(mmbR==1 && !mouse_r) {
 
@@ -763,7 +807,7 @@ nk_retro_handle_event(int *evt,int poll)
    	if(mmbM==0 && mouse_m){
 
       	mmbM=1;
-		mousebut(3,1,revent.gmx,revent.gmy);		
+		mousebut(3,1,revent.gmx,revent.gmy);
    	}
    	else if(mmbM==1 && !mouse_m) {
 
@@ -787,4 +831,3 @@ nk_retro_shutdown(void)
 
 
 #endif
-

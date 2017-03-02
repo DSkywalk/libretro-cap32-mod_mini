@@ -851,7 +851,7 @@ void prerender_normal_half(void)
    *(RendPos + 1) = Swap32(*(RendPos + 1));
    RendPos += 2;
 }
- 
+
 void set_prerender(void)
 {
    LastPreRend =flags1.combined;
@@ -881,7 +881,7 @@ void render8bpp(void)
    uint8_t bCount = *RendWid++;
    while (bCount--)
       *pbPos++ = GateArray.palette[*RendOut++];
-   CPC.scr_pos = (uint32_t *)pbPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pbPos;
 }
 
 
@@ -897,7 +897,7 @@ void render8bpp_doubleY(void)
       *(pbPos + dwLineOffs) = val;
       *pbPos++ = val;
    }
-   CPC.scr_pos = (uint32_t *)pbPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pbPos;
 }
 
 
@@ -909,25 +909,100 @@ void render16bpp(void)
    while (bCount--) {
       *pwPos++ = GateArray.palette[*RendOut++];
    }
-   CPC.scr_pos = (uint32_t *)pwPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pwPos;
+}
+
+void render16bpp_doubleY_scanline(void)
+{
+   register uint32_t *pwPos = (uint32_t *)CPC.scr_pos;
+   register uint32_t * pal = (uint32_t *) GateArray.palette;
+   register uint32_t col = *(pal + *RendOut);
+   RendWid++;
+
+    register uint32_t val = col | col <<16;;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPos++ = val; RendOut += 2;
+
+   CPC.scr_pos += 16;
+}
+
+void render16bpp_doubleY(void)
+{
+    // hack!
+    if(*RendWid != 16){
+        printf("PENE! %u\n", *RendWid);
+        RendWid++;
+        return;
+    }
+    RendWid++;
+
+    register uint32_t *pwPos = (uint32_t *)CPC.scr_pos;
+    register uint32_t *pwPosLine = (uint32_t *) (pwPos + CPC.scr_bps / 2);
+    uint32_t * pal = (uint32_t *) GateArray.palette;
+    register uint32_t col = *(pal + *RendOut);
+    register uint32_t val = col | col <<16;
+
+
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    col = *(pal + *RendOut); val = col | col <<16;
+    *pwPosLine++ = val; *pwPos++ = val; RendOut += 2;
+
+    CPC.scr_pos += 16;
 }
 
 
 
-void render16bpp_doubleY(void)
+void render16bpp_doubleY_base(void)
 {
    register uint16_t *pwPos = (uint16_t *)CPC.scr_pos;
-   register uint32_t dwLineOffs = CPC.scr_bps << 1;
+   register uint32_t dwLineOffs = CPC.scr_bps;
    register uint8_t bCount = *RendWid++;
    while (bCount--) {
       register uint16_t val = GateArray.palette[*RendOut++];
       *(pwPos + dwLineOffs) = val;
       *pwPos++ = val;
    }
-   CPC.scr_pos = (uint32_t *)pwPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pwPos;
 }
-
-
 
 void render24bpp(void)
 {
@@ -939,7 +1014,7 @@ void render24bpp(void)
       *(pbPos + 2) = (uint8_t)(val >> 16);
       pbPos += 3;
    }
-   CPC.scr_pos = (uint32_t *)pbPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pbPos;
 }
 
 
@@ -958,7 +1033,7 @@ void render24bpp_doubleY(void)
       *(pbPos + 2) = (uint8_t)val;
       pbPos += 3;
    }
-   CPC.scr_pos = (uint32_t *)pbPos;
+   CPC.scr_pos = (PIXEL_TYPE *)pbPos;
 }
 
 
@@ -972,8 +1047,86 @@ void render32bpp(void)
 }
 
 
+void render32bpp_doubleY_scanline(void)
+{
+    // hack!
+    //if(*RendWid++ != 16)
+    //    return;
+
+    register uint32_t * pal = (uint32_t *) GateArray.palette;
+    register uint32_t val = *(pal + *RendOut);
+
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+}
+
 
 void render32bpp_doubleY(void)
+{
+    // hack!
+    //if(*RendWid++ != 16)
+    //    return;
+
+    register uint32_t * pal = (uint32_t *) GateArray.palette;
+    register uint32_t *pwPosLine = (uint32_t *) (CPC.scr_pos + (CPC.scr_bps));
+    register uint32_t val = *(pal + *RendOut);
+
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+    val = *(pal + *RendOut);
+    *pwPosLine++ = val; *pwPosLine++ = val;
+    *CPC.scr_pos++ = val; *CPC.scr_pos++ = val; RendOut += 2;
+
+}
+
+
+void render32bpp_doubleY_base(void)
 {
    register uint8_t bCount = *RendWid++;
    while (bCount--) {
@@ -1315,7 +1468,7 @@ void crtc_reset(void)
    RendPos = (uint32_t *)&RendBuff[0];
    RendOut = (uint8_t*)RendStart;
    RendWid = &HorzPix[0];
- 
+
    HorzPos = 0x500;
    HorzChar = 0x04;
    HorzMax = 48;

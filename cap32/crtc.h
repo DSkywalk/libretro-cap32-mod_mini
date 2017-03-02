@@ -56,6 +56,7 @@ void update_skew(void);
 void CharMR1(void);
 void CharMR2(void);
 void prerender_border(void);
+void prerender_border_null(void);
 void prerender_border_half(void);
 void prerender_sync(void);
 void prerender_sync_half(void);

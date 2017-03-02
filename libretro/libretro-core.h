@@ -9,14 +9,17 @@
 
 #include <stdbool.h>
 
-// DEVICE AMSTRAD
+// DEVICE retrow
 #define RETRO_DEVICE_AMSTRAD_KEYBOARD RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_KEYBOARD, 0)
 #define RETRO_DEVICE_AMSTRAD_JOYSTICK RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1)
 
 extern unsigned amstrad_devices[ 2 ];
 
-#define TEX_WIDTH 384
-#define TEX_HEIGHT 272
+#define TEX_MAX_WIDTH 800
+#define TEX_MAX_HEIGHT 600
+
+#define EMU_SND_FREQ 2 //2 - 44k
+#define LIBRETRO_SND_FREQ 44100
 
 //LOG
 #if  defined(__ANDROID__) || defined(ANDROID)
@@ -34,16 +37,23 @@ extern unsigned amstrad_devices[ 2 ];
 #define uint32 uint32_t
 #define uint8 uint8_t
 
-//SCREEN
-extern unsigned int *Retro_Screen;
+#define SCREEN_16BITS
 
+//SCREEN 16BITS
+#ifdef SCREEN_16BITS
 #define PIXEL_BYTES 2
-#define PIXEL_TYPE UINT32
-#define PITCH 4	
+#define PIXEL_TYPE UINT16
+#define M16B
+#endif
 
-#define WINDOW_WIDTH 384
-#define WINDOW_HEIGHT 272
-#define WINDOW_SIZE (384*272)
+//SCREEN 32BITS
+#ifdef SCREEN_32BITS
+#define PIXEL_BYTES 4
+#define PIXEL_TYPE UINT32
+#endif
+
+#define WINDOW_MAX_SIZE (800*600)
+extern PIXEL_TYPE *Retro_Screen;
 
 //VKBD
 #define NPLGN 12
@@ -53,7 +63,7 @@ extern unsigned int *Retro_Screen;
 typedef struct {
 	char norml[NLETT];
 	char shift[NLETT];
-	int val;	
+	int val;
 } Mvk;
 
 extern Mvk MVk[NPLGN*NLIGN*2];
@@ -73,12 +83,23 @@ typedef struct{
      unsigned char r,g,b;
 } retro_pal;
 
+#define MAX_INPUTS 2
+#define MAX_BUTTONS 16
+#define MAX_PADCFG 4
+#define ID_PLAYER1 0
+#define ID_PLAYER2 1
+
 //VARIABLES
-extern int pauseg; 
-extern int CROP_WIDTH;
-extern int CROP_HEIGHT;
-extern int VIRTUAL_WIDTH;
-extern int retrow ; 
-extern int retroh ;
+extern int pauseg;
+extern PIXEL_TYPE * retro_getScreenPtr();
+extern unsigned int retro_getStyle();
+extern unsigned int retro_getGfxBpp();
+extern unsigned int retro_getGfxBps();
+extern void gui_input();
+extern void poll_input();
+
+#ifdef __ARM_NEON__
+extern void armcpy(void *dst, const void *src, int bytes);
+#endif
 
 #endif
