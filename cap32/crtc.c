@@ -914,10 +914,12 @@ void render16bpp(void)
 
 void render16bpp_doubleY_scanline(void)
 {
+    // hackish but quick!
+    if(*RendWid++ != 16)
+        return;
    register uint32_t *pwPos = (uint32_t *)CPC.scr_pos;
    register uint32_t * pal = (uint32_t *) GateArray.palette;
    register uint32_t col = *(pal + *RendOut);
-   RendWid++;
 
     register uint32_t val = col | col <<16;;
     *pwPos++ = val; RendOut += 2;

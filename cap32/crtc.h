@@ -70,10 +70,12 @@ void render8bpp(void);
 void render8bpp_doubleY(void);
 void render16bpp(void);
 void render16bpp_doubleY(void);
+void render16bpp_doubleY_scanline(void);
 void render24bpp(void);
 void render24bpp_doubleY(void);
 void render32bpp(void);
 void render32bpp_doubleY(void);
+void render32bpp_doubleY_scanline(void);
 
 #ifdef __cplusplus
 }

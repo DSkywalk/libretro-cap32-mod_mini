@@ -35,6 +35,7 @@ extern void kbd_buf_feed(char *s);
 extern int Retro_PollEvent();
 extern void retro_loop(void);
 extern int video_set_palette (void);
+extern int video_set_style (void);
 extern int InitOSGLU(void);
 extern int  UnInitOSGLU(void);
 extern void emu_reset(void);
@@ -49,7 +50,7 @@ extern void Screen_SetFullUpdate(int scr);
 //VIDEO
 PIXEL_TYPE *Retro_Screen;
 PIXEL_TYPE save_Screen[WINDOW_MAX_SIZE*PIXEL_BYTES];
-PIXEL_TYPE bmp[WINDOW_MAX_SIZE*PITCH];
+PIXEL_TYPE bmp[WINDOW_MAX_SIZE*PIXEL_BYTES];
 
 //SOUND
 short signed int SNDBUF[1024*2];
@@ -69,7 +70,7 @@ extern int app_render(int poll);
 unsigned int retrow=0;
 unsigned int retroh=0;
 unsigned int retro_scr_style, retro_scr_bps=0;
-unsigned int gfx_buffer_size=0;
+unsigned int gfx_buffer_size=0, retro_scanlines=0;
 
 #include "vkbd.c"
 unsigned amstrad_devices[ 2 ];
@@ -117,6 +118,11 @@ void retro_set_input_poll(retro_input_poll_t cb)
 
 unsigned int retro_getStyle(){
     return retro_scr_style;
+}
+
+unsigned int retro_getScanlines(){
+    printf("getScanlines: %u\n", retro_scanlines);
+    return retro_scanlines;
 }
 
 unsigned int retro_getGfxBpp(){
@@ -383,12 +389,16 @@ void retro_set_environment(retro_environment_t cb)
          "Internal resolution; 384x272|800x600",
       },
       {
+         "cap32_scanlines",
+         "Scanlines (experimental); disabled|enabled",
+      },
+      {
          "cap32_Model",
-         "Model:; 6128|464",
+         "Model; 6128|464",
       },
       {
          "cap32_Ram",
-         "Ram size:; 128|64|512",
+         "Ram size; 128|64|512",
       },
       {
          "cap32_scr_tube",
@@ -397,14 +407,6 @@ void retro_set_environment(retro_environment_t cb)
       {
          "cap32_scr_intensity",
          "scr_intensity; 8|9|10|11|12|13|14|15",
-      },
-      {
-         "cap32_pad1cfg",
-         "Pad1 CFG; cursors|joystick|qaop|sxkl",
-      },
-      {
-         "cap32_pad2cfg",
-         "Pad2 CFG; joystick|qaop|sxkl|cursors",
       },
       #if 0
       {
@@ -576,57 +578,20 @@ static void update_variables(void)
          video_set_palette();
       }
    }
-   var.key = "cap32_pad1cfg";
-   var.value = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (strcmp(var.value, "joystick") == 0) padcfg[ID_PLAYER1] = 1;
-       else if (strcmp(var.value, "qaop") == 0) padcfg[ID_PLAYER1] = 2;
-       else if (strcmp(var.value, "sxkl") == 0) padcfg[ID_PLAYER1] = 3;
-       else padcfg[ID_PLAYER1] = 0;
-   }
 
-   var.key = "cap32_pad2cfg";
-   var.value = NULL;
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-       if (strcmp(var.value, "joystick") == 0) padcfg[ID_PLAYER2] = 1;
-       else if (strcmp(var.value, "qaop") == 0) padcfg[ID_PLAYER2] = 2;
-       else if (strcmp(var.value, "sxkl") == 0) padcfg[ID_PLAYER2] = 3;
-       else padcfg[ID_PLAYER2] = 0;
-   }
-
-#if 0
-   var.key = "cap32_scr_remanency";
+   var.key = "cap32_scanlines";
    var.value = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
-		if(retro_ui_finalized){
-      		if (strcmp(var.value, "enabled") == 0){
-         		  CPC.scr_remanency=1;video_set_palette();}//set_truedrive_emultion(1);
-      		if (strcmp(var.value, "disabled") == 0){
-         		 CPC.scr_remanency=0;video_set_palette();}//set_truedrive_emultion(0);
-		}
+  		if (strcmp(var.value, "enabled") == 0){
+     		  retro_scanlines=1;
+        }else {
+     		 retro_scanlines=0;
+        }
    }
 
 
-   var.key = "cap32_RetroJoy";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-		if(retrojoy_init){
-		      if (strcmp(var.value, "enabled") == 0)
-		         ;//resources_set_int( "RetroJoy", 1);
-		      if (strcmp(var.value, "disabled") == 0)
-		         ;//resources_set_int( "RetroJoy", 0);
-		}
-		else {
-			if (strcmp(var.value, "enabled") == 0)RETROJOY=1;
-			if (strcmp(var.value, "disabled") == 0)RETROJOY=0;
-		}
-
-   }
-   #endif
 }
 
 

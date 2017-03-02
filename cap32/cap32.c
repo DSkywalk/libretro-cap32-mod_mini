@@ -2705,7 +2705,7 @@ int video_set_palette (void)
          if (green > 255)
             green = 255;
 
-         colours[n] = green << 5;
+         colours[n] = (PIXEL_TYPE) RGB2COLOR(0, green, 0);
 
       }
    }
@@ -2752,16 +2752,22 @@ void video_set_style (void)
    switch(CPC.scr_bpp)
    {
       case 16:
-         if(dwYScale == 2)
-            CPC.scr_render = (void(*)(void))render16bpp_doubleY;
-         else
+         if(dwYScale == 2){
+            if(retro_getScanlines())
+                CPC.scr_render = (void(*)(void))render16bpp_doubleY_scanline;
+            else
+                CPC.scr_render = (void(*)(void))render16bpp_doubleY;
+        }else
             CPC.scr_render = (void(*)(void))render16bpp;
          break;
      case 32:
         if(dwYScale == 2)
-           CPC.scr_render = (void(*)(void))render32bpp_doubleY;
+            if(retro_getScanlines())
+                CPC.scr_render = (void(*)(void))render32bpp_doubleY_scanline;
+            else
+                CPC.scr_render = (void(*)(void))render32bpp_doubleY;
         else
-           CPC.scr_render = (void(*)(void))render32bpp;
+            CPC.scr_render = (void(*)(void))render32bpp;
         break;
    }
 }

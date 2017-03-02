@@ -93,6 +93,7 @@ typedef struct{
 extern int pauseg;
 extern PIXEL_TYPE * retro_getScreenPtr();
 extern unsigned int retro_getStyle();
+extern unsigned int retro_getScanlines();
 extern unsigned int retro_getGfxBpp();
 extern unsigned int retro_getGfxBps();
 extern void gui_input();
