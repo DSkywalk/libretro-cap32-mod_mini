@@ -26,6 +26,8 @@ extern long GetTicks(void);
 extern retro_input_poll_t input_poll_cb;
 extern retro_input_state_t input_state_cb;
 
+void update_joy_cfg(int playerID);
+
 extern char RPATH[512];
 
 //EMU FLAGS
@@ -145,6 +147,19 @@ int app_free()
    return 0;
 }
 
+unsigned int message_timer = 0;
+char message_data[256] = {'\0'};
+void app_printf(const char* format, ...){
+    va_list args;
+    va_start (args, format);
+
+    message_timer = GetTicks() + 500000;
+    vsnprintf(message_data, 256, format, args);
+    message_data[255] = '\0';
+    va_end (args);
+}
+
+
 int app_event(int poll)
 {
 	nk_input_begin(ctx);
@@ -231,6 +246,14 @@ void app_vkb_handle()
             break;
         case -13:
             kbd_buf_feed("|CPM\n");
+            oldi=-1;
+            break;
+        case -14:
+            update_joy_cfg(ID_PLAYER1);
+            oldi=-1;
+            break;
+        case -15:
+            update_joy_cfg(ID_PLAYER2);
             oldi=-1;
             break;
         case 0x25:
@@ -325,6 +348,8 @@ const uint8_t translatePAD[MAX_PADCFG][MAX_BUTTONS] = {
     }
 };
 
+char pad_strings[4][5] = { {"curs"}, {"joys"}, {"qaop"}, {"sxkl"}};
+
 unsigned int special_events()
 {
     unsigned int pressed = 0;
@@ -394,6 +419,14 @@ void process_joy(int playerID){
 
 }
 
+void update_joy_cfg(int playerID){
+    padcfg[playerID]++;
+    if(padcfg[playerID] > 3)
+        padcfg[playerID] = 0;
+
+    app_printf("pad %u updated to: %s", playerID + 1, pad_strings[padcfg[playerID]]);
+}
+
 void gui_input()
 {
     if(SHOWKEY < 0)
@@ -404,6 +437,14 @@ void gui_input()
     if( input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT)) {
         last_event = special_events();
         return;
+    }
+
+    if(message_timer) {
+        nk_retro_render_text(10, 10, 100, 100, message_data);
+        unsigned int current = GetTicks();
+        printf("time: %u, %u\n", message_timer, current);
+        if(message_timer < current)
+            message_timer = 0;
     }
 }
 

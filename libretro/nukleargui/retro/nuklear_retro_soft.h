@@ -235,6 +235,20 @@ nk_retro_stroke_curve(RSDL_Surface *surface, struct nk_vec2i p1,
     }
 }
 
+void nk_retro_render_text(short x, short y, short w, short h, const char *text) {
+    RSDL_Surface *surface = retro.screen_surface;
+    int len = strlen(text);
+    boxRGBA(surface, x, y, x + w, y + h, 0, 0, 0, 0);
+    while(len--) {
+#ifdef M16B
+	Retro_Draw_char(surface,  x + (8 * len),  y,  text[len],  1, 1, 0xFFFF,0);
+#else
+	Retro_Draw_char(surface,  x + (8 * len),  y,  text[len],  1, 1, 0xFFFFFFFF);
+#endif
+    }
+
+}
+
 /*static*/ void
 nk_retro_draw_text(RSDL_Surface *surface, short x, short y, unsigned short w, unsigned short h,
     const char *text, int len, nk_retro_Font *font, struct nk_color cbg, struct nk_color cfg)
@@ -440,7 +454,7 @@ nk_retro_get_text_width(nk_handle handle, float height, const char *text, int le
 static void retro_init_event()
 {
 	revent.MOUSE_EMULATED=-1;
-	revent.MOUSE_PAS=4;
+	revent.MOUSE_PAS=5;
 	revent.MOUSE_RELATIVE=10;
 	revent.gmx=(retro.width/2)-1;
 	revent.gmy=(retro.height/2)-1;

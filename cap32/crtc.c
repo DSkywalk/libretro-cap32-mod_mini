@@ -948,13 +948,9 @@ void render16bpp_doubleY_scanline(void)
 
 void render16bpp_doubleY(void)
 {
-    // hack!
-    if(*RendWid != 16){
-        printf("PENE! %u\n", *RendWid);
-        RendWid++;
+    // hackish but quick!
+    if(*RendWid++ != 16)
         return;
-    }
-    RendWid++;
 
     register uint32_t *pwPos = (uint32_t *)CPC.scr_pos;
     register uint32_t *pwPosLine = (uint32_t *) (pwPos + CPC.scr_bps / 2);
@@ -1049,9 +1045,9 @@ void render32bpp(void)
 
 void render32bpp_doubleY_scanline(void)
 {
-    // hack!
-    //if(*RendWid++ != 16)
-    //    return;
+    // hackish but quick!
+    if(*RendWid++ != 16)
+        return;
 
     register uint32_t * pal = (uint32_t *) GateArray.palette;
     register uint32_t val = *(pal + *RendOut);
@@ -1084,9 +1080,9 @@ void render32bpp_doubleY_scanline(void)
 
 void render32bpp_doubleY(void)
 {
-    // hack!
-    //if(*RendWid++ != 16)
-    //    return;
+    // hackish but quick!
+    if(*RendWid++ != 16)
+        return;
 
     register uint32_t * pal = (uint32_t *) GateArray.palette;
     register uint32_t *pwPosLine = (uint32_t *) (CPC.scr_pos + (CPC.scr_bps));

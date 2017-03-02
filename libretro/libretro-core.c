@@ -49,7 +49,7 @@ extern void Screen_SetFullUpdate(int scr);
 //VIDEO
 PIXEL_TYPE *Retro_Screen;
 PIXEL_TYPE save_Screen[WINDOW_MAX_SIZE*PIXEL_BYTES];
-PIXEL_TYPE bmp[WINDOW_MAX_SIZE*PIXEL_BYTES];
+PIXEL_TYPE bmp[WINDOW_MAX_SIZE*PITCH];
 
 //SOUND
 short signed int SNDBUF[1024*2];
@@ -773,7 +773,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "cap32";
-   info->library_version  = "4.2";
+   info->library_version  = "4.2" " dskywalk b" __VDATE__;
    info->valid_extensions = "dsk|sna|zip|tap|cdt|voc";
    info->need_fullpath    = true;
    info->block_extract = false;
